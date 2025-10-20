@@ -105,4 +105,18 @@ impl Directory {
 
         Ok(())
     }
+
+    pub fn entries(&self) -> Vec<String> {
+        let mut entries = Vec::new();
+
+        for subdir in &self.subdirectories {
+            entries.push(format!("{}/", subdir.name));
+        }
+
+        for file in &self.files {
+            entries.push(file.name.clone());
+        }
+
+        entries
+    }
 }

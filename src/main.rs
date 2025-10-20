@@ -15,7 +15,8 @@ async fn main() -> Result<()> {
     let mut current_dir = Directory::new("tui-file-manager".to_string(), ".".to_string());
 
     current_dir.scan_and_add().await.unwrap();
-    dbg!(current_dir);
+    let entries = current_dir.entries();
+    dbg!(entries);
 
     result
 }
