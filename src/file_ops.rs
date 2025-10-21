@@ -55,6 +55,16 @@ impl FileEntry {
     }
 }
 
+impl FromIterator<FileEntry> for Directory {
+    fn from_iter<T: IntoIterator<Item = FileEntry>>(iter: T) -> Self {
+        let mut dir = Directory::new(String::new(), String::new());
+        for file in iter {
+            dir.add_file(file);
+        }
+        dir
+    }
+}
+
 impl Directory {
     pub fn new(name: String, path: String) -> Self {
         Directory {

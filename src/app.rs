@@ -5,23 +5,27 @@ use ratatui::{
     style::{Style, Stylize},
     text::Line,
     widgets::Block,
-    widgets::{List, ListDirection},
+    widgets::{List, ListDirection, ListState},
 };
 
 use crate::file_ops::Directory;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct App {
     pub exit: bool,
     pub dir: Directory,
+    pub list_state: ListState,
 }
 
 impl Default for App {
     fn default() -> Self {
         let current_dir = Directory::new("tui-file-manager".to_string(), ".".to_string());
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
         Self {
             exit: false,
             dir: current_dir,
+            list_state,
         }
     }
 }
@@ -44,12 +48,12 @@ impl App {
         let list = List::new(items)
             .block(Block::bordered().title(self.dir.path.as_str()))
             .style(Style::new().white())
-            .highlight_style(Style::new().italic())
-            .highlight_symbol(">>")
+            .highlight_style(Style::new().italic().yellow())
+            .highlight_symbol(">> ")
             .repeat_highlight_symbol(true)
             .direction(ListDirection::TopToBottom);
 
-        frame.render_widget(list, frame.area())
+        frame.render_stateful_widget(list, frame.area(), &mut self.list_state)
     }
 
     fn handle_crossterm_events(&mut self) -> Result<()> {
@@ -64,9 +68,42 @@ impl App {
     }
 
     fn on_key_event(&mut self, key: KeyEvent) {
-        if let (_, KeyCode::Esc | KeyCode::Char('q')) = (key.modifiers, key.code) {
-            self.quit();
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => self.quit(),
+            KeyCode::Down | KeyCode::Char('j') => self.select_next(),
+            KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            _ => {}
         }
+    }
+
+    fn select_next(&mut self) {
+        let items_len = self.dir.entries().len();
+        if items_len == 0 {
+            return;
+        }
+        let i = match self.list_state.selected() {
+            Some(i) => {
+                // in case we reach the botton, go to top
+                if i >= items_len - 1 { 0 } else { i + 1 }
+            }
+            None => 0,
+        };
+        self.list_state.select(Some(i));
+    }
+
+    fn select_previous(&mut self) {
+        let items_len = self.dir.entries().len();
+        if items_len == 0 {
+            return;
+        }
+        let i = match self.list_state.selected() {
+            Some(i) => {
+                // in case we reach the top, go to the bottom
+                if i == 0 { items_len - 1 } else { i - 1 }
+            }
+            None => 0,
+        };
+        self.list_state.select(Some(i));
     }
 
     fn quit(&mut self) {
