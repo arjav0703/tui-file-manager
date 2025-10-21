@@ -7,9 +7,22 @@ use ratatui::{
     widgets::{Block, Paragraph},
 };
 
-#[derive(Debug)]
+use crate::file_ops::Directory;
+
+#[derive(Debug, Clone)]
 pub struct App {
     pub exit: bool,
+    pub dir: Directory,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        let current_dir = Directory::new("tui-file-manager".to_string(), ".".to_string());
+        Self {
+            exit: false,
+            dir: current_dir,
+        }
+    }
 }
 
 impl App {
