@@ -2,8 +2,8 @@ use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub struct Directory {
-    name: String,
-    path: String,
+    pub name: String,
+    pub path: String,
     files: Vec<FileEntry>,
     subdirectories: Vec<Directory>,
 }
