@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use color_eyre::Result;
 use crossterm::event::{self, Event};
 use ratatui::{DefaultTerminal, Frame};
@@ -8,8 +10,9 @@ use structures::Directory;
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
-    let terminal = ratatui::init();
-    let result = run(terminal);
+    let mut terminal = ratatui::init();
+    let mut app = App { exit: false };
+    let result = app.run(&mut terminal);
     ratatui::restore();
 
     let mut current_dir = Directory::new("tui-file-manager".to_string(), ".".to_string());
@@ -21,15 +24,29 @@ async fn main() -> Result<()> {
     result
 }
 
-fn run(mut terminal: DefaultTerminal) -> Result<()> {
-    loop {
-        terminal.draw(render)?;
-        if matches!(event::read()?, Event::Key(_)) {
-            break Ok(());
-        }
-    }
+pub struct App {
+    pub exit: bool,
 }
 
-fn render(frame: &mut Frame) {
-    frame.render_widget("hello world", frame.area());
+impl App {
+    fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+        use crossterm::event;
+        use std::time::Duration;
+
+        while !self.exit {
+            let _ = terminal.draw(|frame| self.render(frame));
+
+            if event::poll(Duration::from_millis(100))?
+                && let Event::Key(key) = event::read()?
+                && let event::KeyCode::Char('q') = key.code
+            {
+                self.exit = true;
+            }
+        }
+        Ok(())
+    }
+
+    fn render(&self, frame: &mut Frame) {
+        frame.render_widget("hello world", frame.area());
+    }
 }
