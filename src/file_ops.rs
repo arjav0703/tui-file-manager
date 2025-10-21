@@ -53,6 +53,19 @@ impl FileEntry {
 
         filetype
     }
+
+    pub fn assign_symbol(&self) -> String {
+        let symbol = match self.filetype {
+            FileType::Executable => "⚙️ ",
+            FileType::Media => "🎵 ",
+            FileType::Document => "📄 ",
+            FileType::Zip => "🗜️ ",
+            FileType::Code => r"</> ",
+            FileType::Unknown => "❓",
+        };
+
+        format!("{} {}", symbol, self.name)
+    }
 }
 
 impl FromIterator<FileEntry> for Directory {
@@ -127,6 +140,22 @@ impl Directory {
         let sorted_files = self.sort_files();
         for file in &sorted_files.files {
             entries.push(file.name.clone());
+        }
+
+        entries
+    }
+
+    pub fn entries_with_symbols(&self) -> Vec<String> {
+        let mut entries = Vec::new();
+
+        let sorted_dir = self.sort_subdirectories();
+        for subdir in &sorted_dir.subdirectories {
+            entries.push(format!("📂 {}/", subdir.name));
+        }
+
+        let sorted_files = self.sort_files();
+        for file in &sorted_files.files {
+            entries.push(file.assign_symbol())
         }
 
         entries

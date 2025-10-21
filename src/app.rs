@@ -44,7 +44,7 @@ impl App {
             .bold()
             .blue()
             .centered();
-        let items = self.dir.entries();
+        let items = self.dir.entries_with_symbols();
         let list = List::new(items)
             .block(Block::bordered().title(self.dir.path.as_str()))
             .style(Style::new().white())
