@@ -39,9 +39,7 @@ impl App {
             .bold()
             .blue()
             .centered();
-        let text = "Hello, Ratatui!\n\n\
-            Created using https://github.com/ratatui/templates\n\
-            Press `Esc`, `Ctrl-C` or `q` to stop running.";
+        let text = self.get_dir_structure();
         frame.render_widget(
             Paragraph::new(text)
                 .block(Block::bordered().title(title))
@@ -69,5 +67,10 @@ impl App {
 
     fn quit(&mut self) {
         self.exit = true;
+    }
+
+    fn get_dir_structure(&self) -> String {
+        let enrties = self.dir.entries();
+        enrties.join("\n")
     }
 }

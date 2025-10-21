@@ -109,14 +109,34 @@ impl Directory {
     pub fn entries(&self) -> Vec<String> {
         let mut entries = Vec::new();
 
-        for subdir in &self.subdirectories {
+        let sorted_dir = self.sort_subdirectories();
+        for subdir in &sorted_dir.subdirectories {
             entries.push(format!("{}/", subdir.name));
         }
 
-        for file in &self.files {
+        let sorted_files = self.sort_files();
+        for file in &sorted_files.files {
             entries.push(file.name.clone());
         }
 
         entries
+    }
+
+    fn sort_subdirectories(&self) -> Directory {
+        let mut sorted_dir = self.clone();
+        sorted_dir
+            .subdirectories
+            .sort_by(|a, b| a.name.cmp(&b.name));
+        sorted_dir.files.sort_by(|a, b| a.name.cmp(&b.name));
+        sorted_dir
+    }
+
+    fn sort_files(&self) -> Directory {
+        let mut sorted_dir = self.clone();
+        sorted_dir.files.sort_by(|a, b| a.name.cmp(&b.name));
+        sorted_dir
+            .subdirectories
+            .sort_by(|a, b| a.name.cmp(&b.name));
+        sorted_dir
     }
 }
