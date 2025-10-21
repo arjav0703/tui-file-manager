@@ -90,16 +90,16 @@ impl Directory {
 
                     self.add_file(file);
                 }
-            } else if path.is_dir() {
-                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                    let subdirectory = Directory {
-                        name: dir_name.to_string(),
-                        path: path.to_str().unwrap().to_string(),
-                        files: Vec::new(),
-                        subdirectories: Vec::new(),
-                    };
-                    self.add_subdirectory(subdirectory);
-                }
+            } else if path.is_dir()
+                && let Some(dir_name) = path.file_name().and_then(|n| n.to_str())
+            {
+                let subdirectory = Directory {
+                    name: dir_name.to_string(),
+                    path: path.to_str().unwrap().to_string(),
+                    files: Vec::new(),
+                    subdirectories: Vec::new(),
+                };
+                self.add_subdirectory(subdirectory);
             }
         }
 
