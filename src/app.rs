@@ -70,8 +70,9 @@ impl App {
             KeyCode::Esc | KeyCode::Char('q') => self.quit(),
             KeyCode::Down | KeyCode::Char('j') => self.select_next(),
             KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => self.enter_directory().await?,
+            KeyCode::Right | KeyCode::Char('l') => self.enter_directory().await?,
             KeyCode::Left | KeyCode::Char('h') => self.go_to_parent().await?,
+            KeyCode::Enter => self.open_file(),
             _ => {}
         }
         Ok(())
@@ -152,6 +153,60 @@ impl App {
             self.list_state.select(Some(0));
         }
         Ok(())
+    }
+
+    fn open_file(&mut self) {
+        use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+        use std::process::Command;
+
+        if let Some(file_index) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(file_index)
+            // && !selected_entry.ends_with('/')
+            {
+                let full_path = format!("{}/{}", self.dir.path, selected_entry);
+
+                // leave TUI mode (temporarily)
+                if let Err(e) = disable_raw_mode() {
+                    eprintln!("Failed to disable raw mode: {e}");
+                }
+
+                #[cfg(target_os = "macos")]
+                let mut cmd = Command::new("open");
+                #[cfg(target_os = "linux")]
+                let mut cmd = Command::new("xdg-open");
+                #[cfg(target_os = "windows")]
+                let mut cmd = Command::new("cmd");
+
+                #[cfg(target_os = "windows")]
+                {
+                    cmd.args(["/C", "start", "", &full_path])
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null());
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    cmd.arg(&full_path)
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null());
+                }
+
+                match cmd.status() {
+                    Ok(status) => {
+                        if !status.success() {
+                            // eprintln!("Failed to open file: {:?}", status);
+                        }
+                    }
+                    Err(_err) => {
+                        // eprintln!("Error launching file: {err}");
+                    }
+                }
+
+                if let Err(e) = enable_raw_mode() {
+                    eprintln!("Failed to enable raw mode: {e}");
+                }
+            }
+        }
     }
 
     fn quit(&mut self) {
