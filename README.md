@@ -11,3 +11,4 @@ This is a simple TUI (terminal user interface) file manager built with Rust. It 
 - `d`: Delete the selected file or directory
 - `ENTER` : Open the selected file with the default system application (`open` on macOS, `xdg-open` on Linux, `start` on Windows)
 - `r`: Rename the selected file or directory
+- `y`: Copy the selected file or directory

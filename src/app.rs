@@ -20,6 +20,8 @@ pub struct App {
     pub list_state: ListState,
     pub show_confirmation: bool,
     pub show_rename: bool,
+    pub show_new_file: bool,
+    pub new_file_input: TextArea<'static>,
     pub file_to_delete: Option<String>,
     pub file_to_rename: Option<String>,
     pub rename_input: TextArea<'static>,
@@ -34,6 +36,9 @@ impl App {
         let mut rename_input = TextArea::default();
         rename_input.set_block(Block::bordered().title("New name"));
 
+        let mut new_file_input = TextArea::default();
+        new_file_input.set_block(Block::bordered().title("New name"));
+
         Self {
             exit: false,
             dir: current_dir,
@@ -43,6 +48,8 @@ impl App {
             file_to_rename: None,
             file_to_delete: None,
             rename_input,
+            new_file_input,
+            show_new_file: false,
         }
     }
 
@@ -91,6 +98,15 @@ impl App {
 
             frame.render_widget(&self.rename_input, inner);
         }
+
+        if self.show_new_file {
+            let area = centered_rect(50, 20, frame.area());
+            let block = Block::bordered().title("New File");
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+
+            frame.render_widget(&self.new_file_input, inner);
+        }
     }
 
     async fn handle_crossterm_events(&mut self) -> Result<()> {
@@ -102,6 +118,16 @@ impl App {
                 && key.kind == KeyEventKind::Press
             {
                 self.handle_rename_input(*key).await?;
+            }
+            return Ok(());
+        }
+
+        // Handle new file input separately
+        if self.show_new_file {
+            if let Event::Key(key) = &event
+                && key.kind == KeyEventKind::Press
+            {
+                self.handle_new_file_input(*key).await?;
             }
             return Ok(());
         }
@@ -154,6 +180,37 @@ impl App {
         Ok(())
     }
 
+    async fn handle_new_file_input(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Enter => {
+                let new_name = self.new_file_input.lines().join("").trim().to_string();
+                if !new_name.is_empty() {
+                    let new_path = format!("{}/{}", self.dir.path, new_name);
+                    if let Err(err) = fs::File::create(&new_path) {
+                        eprintln!("Failed to create file: {err}");
+                    } else {
+                        self.dir.scan_and_add().await.unwrap();
+                    }
+                }
+                self.new_file_input = TextArea::default();
+                self.new_file_input
+                    .set_block(Block::bordered().title("New name"));
+                self.show_new_file = false;
+            }
+            KeyCode::Esc => {
+                self.new_file_input = TextArea::default();
+                self.new_file_input
+                    .set_block(Block::bordered().title("New name"));
+                self.show_new_file = false;
+            }
+            _ => {
+                // Pass the event to the text area input
+                self.new_file_input.input(Event::Key(key));
+            }
+        }
+        Ok(())
+    }
+
     async fn on_key_event(&mut self, key: KeyEvent) -> Result<()> {
         if self.show_confirmation {
             match key.code {
@@ -189,6 +246,7 @@ impl App {
             KeyCode::Delete | KeyCode::Char('d') | KeyCode::Backspace => self.delete_file().await,
             KeyCode::Char('r') => self.rename_file(),
             KeyCode::Char('y') => self.yank_file(),
+            KeyCode::Char('a') => self.new_file(),
             _ => {}
         }
         Ok(())
@@ -394,6 +452,13 @@ impl App {
                 let _ = process.wait();
             }
         }
+    }
+
+    fn new_file(&mut self) {
+        self.show_new_file = true;
+        self.rename_input = TextArea::default();
+        self.rename_input
+            .set_block(Block::bordered().title("New name"));
     }
 }
 
