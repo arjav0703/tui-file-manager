@@ -188,6 +188,7 @@ impl App {
             KeyCode::Enter => self.open_file(),
             KeyCode::Delete | KeyCode::Char('d') | KeyCode::Backspace => self.delete_file().await,
             KeyCode::Char('r') => self.rename_file(),
+            KeyCode::Char('y') => self.yank_file(),
             _ => {}
         }
         Ok(())
@@ -352,6 +353,45 @@ impl App {
                 self.rename_input = TextArea::from([current_name]);
                 self.rename_input
                     .set_block(Block::bordered().title("New name"));
+            }
+        }
+    }
+
+    fn yank_file(&mut self) {
+        use std::process::Command;
+
+        if let Some(i) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(i) {
+                let full_path = format!("{}/{}", self.dir.path, selected_entry);
+
+                #[cfg(target_os = "macos")]
+                let mut cmd = Command::new("pbcopy");
+                #[cfg(target_os = "linux")]
+                let mut cmd = Command::new("xclip");
+                #[cfg(target_os = "windows")]
+                let mut cmd = Command::new("clip");
+
+                #[cfg(target_os = "linux")]
+                {
+                    cmd.args(["-selection", "clipboard"]);
+                }
+
+                let mut process = cmd
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .expect("Failed to spawn clipboard command");
+
+                if let Some(stdin) = process.stdin.as_mut() {
+                    use std::io::Write;
+                    stdin
+                        .write_all(full_path.as_bytes())
+                        .expect("Failed to write to clipboard");
+                }
+
+                let _ = process.wait();
             }
         }
     }
