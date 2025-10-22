@@ -179,3 +179,20 @@ impl Directory {
         sorted_dir
     }
 }
+
+pub async fn get_current_directory() -> Result<Directory> {
+    use std::env;
+
+    let current_path = env::current_dir()?;
+    let dir_name = current_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+    let path_str = current_path.to_str().unwrap_or("").to_string();
+
+    let mut directory = Directory::new(dir_name, path_str);
+    directory.scan_and_add().await.unwrap();
+
+    Ok(directory)
+}

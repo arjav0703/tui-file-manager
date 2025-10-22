@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{List, ListDirection, ListState},
 };
 
-use crate::file_ops::Directory;
+use crate::file_ops::{self, Directory};
 
 #[derive(Debug)]
 pub struct App {
@@ -17,9 +17,9 @@ pub struct App {
     pub list_state: ListState,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        let current_dir = Directory::new("tui-file-manager".to_string(), ".".to_string());
+impl App {
+    pub async fn new() -> Self {
+        let current_dir = file_ops::get_current_directory().await.unwrap();
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         Self {
@@ -28,9 +28,7 @@ impl Default for App {
             list_state,
         }
     }
-}
 
-impl App {
     pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.render(frame))?;
