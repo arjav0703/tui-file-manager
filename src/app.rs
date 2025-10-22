@@ -90,8 +90,10 @@ impl App {
                 KeyCode::Char('y') => {
                     if let Some(file) = &self.file_to_delete {
                         let full_path = format!("{}/{}", self.dir.path, file);
-                        if let Err(e) = fs::remove_file(&full_path) {
-                            eprintln!("Failed to delete {}: {}", full_path, e);
+                        if let Err(_e) = fs::remove_file(&full_path) {
+                            fs::remove_dir_all(&full_path).unwrap_or_else(|err| {
+                                eprintln!("Failed to delete directory: {err}");
+                            });
                         }
                         self.dir.scan_and_add().await.unwrap();
                     }
@@ -261,7 +263,7 @@ impl App {
         if let Some(i) = self.list_state.selected() {
             let entries = self.dir.entries();
             if let Some(selected_entry) = entries.get(i)
-                && !selected_entry.ends_with('/')
+            // && !selected_entry.ends_with('/')
             {
                 self.show_confirmation = true;
                 self.file_to_delete = Some(selected_entry.clone());
