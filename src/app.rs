@@ -73,6 +73,7 @@ impl App {
             KeyCode::Right | KeyCode::Char('l') => self.enter_directory().await?,
             KeyCode::Left | KeyCode::Char('h') => self.go_to_parent().await?,
             KeyCode::Enter => self.open_file(),
+            KeyCode::Delete | KeyCode::Char('d') | KeyCode::Backspace => self.delete_file().await,
             _ => {}
         }
         Ok(())
@@ -155,6 +156,12 @@ impl App {
         Ok(())
     }
 
+    fn quit(&mut self) {
+        self.exit = true;
+    }
+}
+
+impl App {
     fn open_file(&mut self) {
         use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
         use std::process::Command;
@@ -209,7 +216,26 @@ impl App {
         }
     }
 
-    fn quit(&mut self) {
-        self.exit = true;
+    async fn delete_file(&mut self) {
+        if let Some(selected_file_index) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            let selected_entry = entries.get(selected_file_index).unwrap();
+            let full_path = format!("{}/{}", self.dir.path, selected_entry);
+
+            if std::fs::remove_file(&full_path).is_ok() {
+                // Remove the file from the directory listing
+                self.dir.files.retain(|f| f.name != *selected_entry);
+                // Adjust the selected index if necessary
+                let new_index =
+                    if selected_file_index >= self.dir.entries().len() && selected_file_index > 0 {
+                        selected_file_index - 1
+                    } else {
+                        selected_file_index
+                    };
+                self.list_state.select(Some(new_index));
+            }
+
+            self.dir.scan_and_add().await.unwrap();
+        }
     }
 }
