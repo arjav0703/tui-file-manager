@@ -96,6 +96,9 @@ impl Directory {
     }
 
     pub async fn scan_and_add(&mut self) -> Result<()> {
+        self.files.clear();
+        self.subdirectories.clear();
+
         use std::fs;
 
         let entries = fs::read_dir(&self.path)?;
@@ -191,8 +194,7 @@ pub async fn get_current_directory() -> Result<Directory> {
         .to_string();
     let path_str = current_path.to_str().unwrap_or("").to_string();
 
-    let mut directory = Directory::new(dir_name, path_str);
-    directory.scan_and_add().await.unwrap();
+    let directory = Directory::new(dir_name, path_str);
 
     Ok(directory)
 }
