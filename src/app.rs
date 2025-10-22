@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
@@ -9,6 +9,7 @@ use ratatui::{
     widgets::{Block, List, ListDirection, ListState, Paragraph, Widget},
 };
 use std::fs;
+use tui_textarea::TextArea;
 
 use crate::file_ops::{self, Directory};
 
@@ -18,7 +19,10 @@ pub struct App {
     pub dir: Directory,
     pub list_state: ListState,
     pub show_confirmation: bool,
+    pub show_rename: bool,
     pub file_to_delete: Option<String>,
+    pub file_to_rename: Option<String>,
+    pub rename_input: TextArea<'static>,
 }
 
 impl App {
@@ -26,12 +30,19 @@ impl App {
         let current_dir = file_ops::get_current_directory().await.unwrap();
         let mut list_state = ListState::default();
         list_state.select(Some(0));
+
+        let mut rename_input = TextArea::default();
+        rename_input.set_block(Block::bordered().title("New name"));
+
         Self {
             exit: false,
             dir: current_dir,
             list_state,
+            show_rename: false,
             show_confirmation: false,
+            file_to_rename: None,
             file_to_delete: None,
+            rename_input,
         }
     }
 
@@ -71,15 +82,74 @@ impl App {
 
             frame.render_widget(dialog, area);
         }
+
+        if self.show_rename {
+            let area = centered_rect(50, 20, frame.area());
+            let block = Block::bordered().title("Rename File");
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+
+            frame.render_widget(&self.rename_input, inner);
+        }
     }
 
     async fn handle_crossterm_events(&mut self) -> Result<()> {
-        match event::read()? {
+        let event = event::read()?;
+
+        // Handle rename input separately to pass the raw event
+        if self.show_rename {
+            if let Event::Key(key) = &event
+                && key.kind == KeyEventKind::Press
+            {
+                self.handle_rename_input(*key).await?;
+            }
+            return Ok(());
+        }
+
+        match event {
             // it's important to check KeyEventKind::Press to avoid handling key release events
             Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key).await?,
             Event::Mouse(_) => {}
             Event::Resize(_, _) => {}
             _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_rename_input(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Enter => {
+                if let Some(old_name) = &self.file_to_rename {
+                    let new_name = self.rename_input.lines().join("").trim().to_string();
+                    if !new_name.is_empty() {
+                        // Remove trailing slash if it's a directory
+                        let old_name_clean = old_name.trim_end_matches('/');
+                        let old_path = format!("{}/{}", self.dir.path, old_name_clean);
+                        let new_path = format!("{}/{}", self.dir.path, new_name);
+                        if let Err(err) = fs::rename(&old_path, &new_path) {
+                            eprintln!("Failed to rename file: {err}");
+                        } else {
+                            self.dir.scan_and_add().await.unwrap();
+                        }
+                    }
+                }
+                self.rename_input = TextArea::default();
+                self.rename_input
+                    .set_block(Block::bordered().title("New name"));
+                self.show_rename = false;
+                self.file_to_rename = None;
+            }
+            KeyCode::Esc => {
+                self.rename_input = TextArea::default();
+                self.rename_input
+                    .set_block(Block::bordered().title("New name"));
+                self.show_rename = false;
+                self.file_to_rename = None;
+            }
+            _ => {
+                // Pass the event to the text area input
+                self.rename_input.input(Event::Key(key));
+            }
         }
         Ok(())
     }
@@ -117,6 +187,7 @@ impl App {
             KeyCode::Left | KeyCode::Char('h') => self.go_to_parent().await?,
             KeyCode::Enter => self.open_file(),
             KeyCode::Delete | KeyCode::Char('d') | KeyCode::Backspace => self.delete_file().await,
+            KeyCode::Char('r') => self.rename_file(),
             _ => {}
         }
         Ok(())
@@ -262,11 +333,25 @@ impl App {
     async fn delete_file(&mut self) {
         if let Some(i) = self.list_state.selected() {
             let entries = self.dir.entries();
-            if let Some(selected_entry) = entries.get(i)
-            // && !selected_entry.ends_with('/')
-            {
+            if let Some(selected_entry) = entries.get(i) {
                 self.show_confirmation = true;
                 self.file_to_delete = Some(selected_entry.clone());
+            }
+        }
+    }
+
+    fn rename_file(&mut self) {
+        if let Some(i) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(i) {
+                self.show_rename = true;
+                self.file_to_rename = Some(selected_entry.to_string());
+
+                // Pre-populate the input with the current filename
+                let current_name = selected_entry.trim_end_matches('/');
+                self.rename_input = TextArea::from([current_name]);
+                self.rename_input
+                    .set_block(Block::bordered().title("New name"));
             }
         }
     }
