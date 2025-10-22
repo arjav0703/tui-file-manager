@@ -4,12 +4,12 @@ use anyhow::Result;
 pub struct Directory {
     pub name: String,
     pub path: String,
-    files: Vec<FileEntry>,
-    subdirectories: Vec<Directory>,
+    pub files: Vec<FileEntry>,
+    pub subdirectories: Vec<Directory>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum FileType {
+pub enum FileType {
     Executable,
     Media,
     Document,
@@ -19,9 +19,9 @@ enum FileType {
 }
 
 #[derive(Debug, Clone)]
-struct FileEntry {
-    name: String,
-    filetype: FileType,
+pub struct FileEntry {
+    pub name: String,
+    pub filetype: FileType,
 }
 
 impl FileEntry {

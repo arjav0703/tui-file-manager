@@ -70,6 +70,21 @@ impl App {
             KeyCode::Esc | KeyCode::Char('q') => self.quit(),
             KeyCode::Down | KeyCode::Char('j') => self.select_next(),
             KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Enter => {
+                if let Some(i) = self.list_state.selected()
+                    && let Some(selected_entry) = self.dir.entries().get(i)
+                    && selected_entry.ends_with('/')
+                {
+                    // it's a directory
+                    let dir_name = selected_entry.trim_end_matches('/');
+                    if let Some(subdir) =
+                        self.dir.subdirectories.iter().find(|d| d.name == dir_name)
+                    {
+                        self.dir = subdir.clone();
+                        self.list_state.select(Some(0));
+                    }
+                }
+            }
             _ => {}
         }
     }
