@@ -29,10 +29,10 @@ impl App {
         }
     }
 
-    pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+    pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.render(frame))?;
-            self.handle_crossterm_events()?;
+            self.handle_crossterm_events().await?;
         }
         Ok(())
     }
@@ -54,10 +54,10 @@ impl App {
         frame.render_stateful_widget(list, frame.area(), &mut self.list_state)
     }
 
-    fn handle_crossterm_events(&mut self) -> Result<()> {
+    async fn handle_crossterm_events(&mut self) -> Result<()> {
         match event::read()? {
             // it's important to check KeyEventKind::Press to avoid handling key release events
-            Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key),
+            Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key).await?,
             Event::Mouse(_) => {}
             Event::Resize(_, _) => {}
             _ => {}
@@ -65,28 +65,16 @@ impl App {
         Ok(())
     }
 
-    fn on_key_event(&mut self, key: KeyEvent) {
+    async fn on_key_event(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => self.quit(),
             KeyCode::Down | KeyCode::Char('j') => self.select_next(),
             KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
-            KeyCode::Enter => {
-                if let Some(i) = self.list_state.selected()
-                    && let Some(selected_entry) = self.dir.entries().get(i)
-                    && selected_entry.ends_with('/')
-                {
-                    // it's a directory
-                    let dir_name = selected_entry.trim_end_matches('/');
-                    if let Some(subdir) =
-                        self.dir.subdirectories.iter().find(|d| d.name == dir_name)
-                    {
-                        self.dir = subdir.clone();
-                        self.list_state.select(Some(0));
-                    }
-                }
-            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => self.enter_directory().await?,
+            KeyCode::Left | KeyCode::Char('h') => self.go_to_parent().await?,
             _ => {}
         }
+        Ok(())
     }
 
     fn select_next(&mut self) {
@@ -117,6 +105,53 @@ impl App {
             None => 0,
         };
         self.list_state.select(Some(i));
+    }
+
+    async fn enter_directory(&mut self) -> Result<()> {
+        if let Some(i) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(i) {
+                // Check if it's a directory (ends with '/')
+                if selected_entry.ends_with('/') {
+                    let dir_name = selected_entry.trim_end_matches('/');
+                    // Find the subdirectory and navigate into it
+                    if let Some(subdir) =
+                        self.dir.subdirectories.iter().find(|d| d.name == dir_name)
+                    {
+                        let new_path = subdir.path.clone();
+                        let new_name = subdir.name.clone();
+                        self.dir = Directory::new(new_name, new_path);
+
+                        // Scan the new directory
+                        self.dir.scan_and_add().await.unwrap();
+                        self.list_state.select(Some(0));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn go_to_parent(&mut self) -> Result<()> {
+        use std::path::Path;
+
+        let current_path = Path::new(&self.dir.path);
+        if let Some(parent) = current_path.parent()
+            && let Some(parent_str) = parent.to_str()
+        {
+            let parent_name = parent
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            self.dir = Directory::new(parent_name, parent_str.to_string());
+
+            // Scan the parent directory
+            self.dir.scan_and_add().await.unwrap();
+            self.list_state.select(Some(0));
+        }
+        Ok(())
     }
 
     fn quit(&mut self) {
