@@ -13,3 +13,9 @@ This is a simple TUI (terminal user interface) file manager built with Rust. It 
 - `r`: Rename the selected file or directory
 - `y`: Copy the selected file or directory
 - `a`: Add a new file
+
+
+#### TODO: 
+1. create a little bar on the bottom to show supported commands
+2. better theme with more colors.
+3. Implement copy, paste and cut on files and directories.
