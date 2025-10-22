@@ -2,11 +2,13 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
+    buffer::Buffer,
+    layout::Rect,
     style::{Style, Stylize},
-    text::Line,
-    widgets::Block,
-    widgets::{List, ListDirection, ListState},
+    text::{Line, Text},
+    widgets::{Block, List, ListDirection, ListState, Paragraph, Widget},
 };
+use std::fs;
 
 use crate::file_ops::{self, Directory};
 
@@ -15,6 +17,8 @@ pub struct App {
     pub exit: bool,
     pub dir: Directory,
     pub list_state: ListState,
+    pub show_confirmation: bool,
+    pub file_to_delete: Option<String>,
 }
 
 impl App {
@@ -26,6 +30,8 @@ impl App {
             exit: false,
             dir: current_dir,
             list_state,
+            show_confirmation: false,
+            file_to_delete: None,
         }
     }
 
@@ -38,10 +44,6 @@ impl App {
     }
 
     fn render(&mut self, frame: &mut Frame) {
-        let _title = Line::from("Ratatui Simple Template")
-            .bold()
-            .blue()
-            .centered();
         let items = self.dir.entries_with_symbols();
         let list = List::new(items)
             .block(Block::bordered().title(self.dir.path.as_str()))
@@ -51,7 +53,24 @@ impl App {
             .repeat_highlight_symbol(true)
             .direction(ListDirection::TopToBottom);
 
-        frame.render_stateful_widget(list, frame.area(), &mut self.list_state)
+        frame.render_stateful_widget(list, frame.area(), &mut self.list_state);
+
+        // Render confirmation overlay if active
+        if self.show_confirmation {
+            let area = centered_rect(50, 20, frame.area());
+            let msg = if let Some(file) = &self.file_to_delete {
+                format!("Delete '{}'? (y/n)", file)
+            } else {
+                "Delete file? (y/n)".to_string()
+            };
+
+            let dialog = ConfirmationDialog {
+                message: msg,
+                // confirmed: false,
+            };
+
+            frame.render_widget(dialog, area);
+        }
     }
 
     async fn handle_crossterm_events(&mut self) -> Result<()> {
@@ -66,6 +85,28 @@ impl App {
     }
 
     async fn on_key_event(&mut self, key: KeyEvent) -> Result<()> {
+        if self.show_confirmation {
+            match key.code {
+                KeyCode::Char('y') => {
+                    if let Some(file) = &self.file_to_delete {
+                        let full_path = format!("{}/{}", self.dir.path, file);
+                        if let Err(e) = fs::remove_file(&full_path) {
+                            eprintln!("Failed to delete {}: {}", full_path, e);
+                        }
+                        self.dir.scan_and_add().await.unwrap();
+                    }
+                    self.show_confirmation = false;
+                    self.file_to_delete = None;
+                }
+                KeyCode::Char('n') | KeyCode::Esc => {
+                    self.show_confirmation = false;
+                    self.file_to_delete = None;
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => self.quit(),
             KeyCode::Down | KeyCode::Char('j') => self.select_next(),
@@ -217,25 +258,53 @@ impl App {
     }
 
     async fn delete_file(&mut self) {
-        if let Some(selected_file_index) = self.list_state.selected() {
+        if let Some(i) = self.list_state.selected() {
             let entries = self.dir.entries();
-            let selected_entry = entries.get(selected_file_index).unwrap();
-            let full_path = format!("{}/{}", self.dir.path, selected_entry);
-
-            if std::fs::remove_file(&full_path).is_ok() {
-                // Remove the file from the directory listing
-                self.dir.files.retain(|f| f.name != *selected_entry);
-                // Adjust the selected index if necessary
-                let new_index =
-                    if selected_file_index >= self.dir.entries().len() && selected_file_index > 0 {
-                        selected_file_index - 1
-                    } else {
-                        selected_file_index
-                    };
-                self.list_state.select(Some(new_index));
+            if let Some(selected_entry) = entries.get(i)
+                && !selected_entry.ends_with('/')
+            {
+                self.show_confirmation = true;
+                self.file_to_delete = Some(selected_entry.clone());
             }
-
-            self.dir.scan_and_add().await.unwrap();
         }
     }
+}
+
+struct ConfirmationDialog {
+    message: String,
+    // confirmed: bool,
+}
+
+impl Widget for ConfirmationDialog {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered().title("Confirm Deletion");
+        let inner = block.inner(area);
+        block.render(area, buf);
+
+        let text = Text::from(Line::from(self.message.as_str()).centered());
+        Paragraph::new(text).centered().render(inner, buf);
+    }
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    use ratatui::layout::{Constraint, Direction, Layout};
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    let horizontal = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1]);
+
+    horizontal[1]
 }
