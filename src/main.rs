@@ -1,5 +1,4 @@
 use color_eyre::Result;
-
 mod app;
 mod file_ops;
 use app::App;
@@ -11,6 +10,11 @@ async fn main() -> Result<()> {
 
     let mut app = App::new().await;
     app.dir.scan_and_add().await.unwrap();
+
+    let subdir = app.dir.subdirectories.first().cloned();
+
+    app.subdir = subdir;
+    // fs::write("./log", format!("{:?}", subdir)).unwrap();
 
     let result = app.run(terminal).await;
 

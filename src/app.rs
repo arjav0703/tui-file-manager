@@ -17,6 +17,7 @@ use crate::file_ops::{self, Directory};
 pub struct App {
     pub exit: bool,
     pub dir: Directory,
+    pub subdir: Option<Directory>,
     pub list_state: ListState,
     pub show_confirmation: bool,
     pub show_rename: bool,
@@ -39,9 +40,10 @@ impl App {
         let mut new_file_input = TextArea::default();
         new_file_input.set_block(Block::bordered().title("New name"));
 
-        Self {
+        let mut app = Self {
             exit: false,
             dir: current_dir,
+            subdir: None,
             list_state,
             show_rename: false,
             show_confirmation: false,
@@ -50,7 +52,10 @@ impl App {
             rename_input,
             new_file_input,
             show_new_file: false,
-        }
+        };
+
+        app.update_subdir_preview_async().await;
+        app
     }
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
@@ -73,7 +78,7 @@ impl App {
 
         let helper_text = Text::from(
             Line::from("q: Quit | ↑/k: Up | ↓/j: Down | ←/h: Back | →/l: Enter | Enter: Open | d: Delete | r: Rename | y: Yank Path | a: New File")
-                .style(Style::new().dark_gray()),
+            .style(Style::new().dark_gray()),
         );
 
         // frame.render_stateful_widget(list, frame.area(), &mut self.list_state);
@@ -82,11 +87,35 @@ impl App {
             Rect {
                 x: 0,
                 y: 0,
-                width: frame.area().width,
+                width: frame.area().width / 2,
                 height: frame.area().height - 2,
             },
             &mut self.list_state,
         );
+
+        let items2 = if let Some(subdir) = &self.subdir {
+            subdir.entries_with_symbols()
+        } else {
+            vec!["No subdirectory".to_string()]
+        };
+        let list2 = List::new(items2)
+            .block(Block::bordered().title("Subdirectory"))
+            .style(Style::new().white())
+            .highlight_style(Style::new().italic().yellow())
+            .highlight_symbol(">> ")
+            .repeat_highlight_symbol(true)
+            .direction(ListDirection::TopToBottom);
+
+        frame.render_widget(
+            list2,
+            Rect {
+                x: frame.area().width / 2,
+                y: 0,
+                width: frame.area().width / 2,
+                height: frame.area().height - 2,
+            },
+        );
+
         frame.render_widget(
             Paragraph::new(helper_text).centered(),
             Rect {
@@ -262,8 +291,14 @@ impl App {
 
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => self.quit(),
-            KeyCode::Down | KeyCode::Char('j') => self.select_next(),
-            KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.select_next();
+                self.update_subdir_preview_async().await;
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.select_previous();
+                self.update_subdir_preview_async().await;
+            }
             KeyCode::Right | KeyCode::Char('l') => self.enter_directory().await?,
             KeyCode::Left | KeyCode::Char('h') => self.go_to_parent().await?,
             KeyCode::Enter => self.open_file(),
@@ -306,6 +341,29 @@ impl App {
         self.list_state.select(Some(i));
     }
 
+    async fn update_subdir_preview_async(&mut self) {
+        if let Some(i) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(i)
+                && selected_entry.ends_with('/')
+            {
+                let dir_name = selected_entry.trim_end_matches('/');
+
+                if let Some(subdir) = self.dir.subdirectories.iter().find(|d| d.name == dir_name) {
+                    let mut preview_dir = Directory::new(subdir.name.clone(), subdir.path.clone());
+                    // Scan asynchronously
+                    if preview_dir.scan_and_add().await.is_ok() {
+                        self.subdir = Some(preview_dir);
+                    } else {
+                        self.subdir = None;
+                    }
+                    return;
+                }
+            }
+        }
+        self.subdir = None;
+    }
+
     async fn enter_directory(&mut self) -> Result<()> {
         if let Some(i) = self.list_state.selected() {
             let entries = self.dir.entries();
@@ -324,6 +382,7 @@ impl App {
                         // Scan the new directory
                         self.dir.scan_and_add().await.unwrap();
                         self.list_state.select(Some(0));
+                        self.update_subdir_preview_async().await;
                     }
                 }
             }
@@ -349,6 +408,7 @@ impl App {
             // Scan the parent directory
             self.dir.scan_and_add().await.unwrap();
             self.list_state.select(Some(0));
+            self.update_subdir_preview_async().await;
         }
         Ok(())
     }

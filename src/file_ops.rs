@@ -129,6 +129,8 @@ impl Directory {
             }
         }
 
+        self.subdirectories = self.sort_subdirectories().subdirectories;
+        self.files = self.sort_files().files;
         Ok(())
     }
 
