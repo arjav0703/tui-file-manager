@@ -30,7 +30,7 @@ pub struct App {
 }
 
 #[derive(Debug)]
-struct Clipboard {
+pub struct Clipboard {
     pub cut: bool,
     pub path: String,
 }
@@ -75,43 +75,92 @@ impl App {
     }
 
     fn render(&mut self, frame: &mut Frame) {
+        use ratatui::style::Color;
+        use ratatui::widgets::BorderType;
+
         let items = self.dir.entries_with_symbols();
+        
+        // Main directory list with styled border
         let list = List::new(items)
-            .block(Block::bordered().title(self.dir.path.as_str()))
+            .block(
+                Block::bordered()
+                    .title(format!(" 📁 {} ", self.dir.path))
+                    .title_style(Style::new().bold().cyan())
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::new().cyan())
+            )
             .style(Style::new().white())
-            .highlight_style(Style::new().italic().yellow())
-            .highlight_symbol(">> ")
+            .highlight_style(
+                Style::new()
+                    .bg(Color::Rgb(60, 60, 80))
+                    .fg(Color::Rgb(255, 215, 0))
+                    .bold()
+            )
+            .highlight_symbol("▶ ")
             .repeat_highlight_symbol(true)
             .direction(ListDirection::TopToBottom);
 
-        let helper_text = Text::from(
-            Line::from("q: Quit | ↑/k: Up | ↓/j: Down | ←/h: Back | →/l: Enter | Enter: Open | d: Delete | r: Rename | y: Yank Path | a: New File")
-            .style(Style::new().dark_gray()),
-        );
+        let helper_text = Text::from(vec![
+            Line::from(vec![
+                " q:Quit ".into(),
+                "│".dark_gray(),
+                " ↑↓/jk:Nav ".into(),
+                "│".dark_gray(),
+                " ←→/hl:Dir ".into(),
+                "│".dark_gray(),
+                " Enter:Open ".into(),
+                "│".dark_gray(),
+                " d:Del ".into(),
+                "│".dark_gray(),
+                " r:Rename ".into(),
+            ]).style(Style::new().fg(Color::Rgb(200, 200, 200))),
+            Line::from(vec![
+                " y:Yank ".into(),
+                "│".dark_gray(),
+                " a:New ".into(),
+                "│".dark_gray(),
+                " c:Copy ".into(),
+                "│".dark_gray(),
+                " x:Cut ".into(),
+                "│".dark_gray(),
+                " p:Paste ".into(),
+            ]).style(Style::new().fg(Color::Rgb(200, 200, 200))),
+        ]);
 
-        // frame.render_stateful_widget(list, frame.area(), &mut self.list_state);
+        // Render main list
         frame.render_stateful_widget(
             list,
             Rect {
                 x: 0,
                 y: 0,
                 width: frame.area().width / 2,
-                height: frame.area().height - 2,
+                height: frame.area().height - 3,
             },
             &mut self.list_state,
         );
 
+        // Preview panel
         let items2 = if let Some(subdir) = &self.subdir {
             subdir.entries_with_symbols()
         } else {
-            vec!["No subdirectory".to_string()]
+            vec!["   No preview available".to_string()]
         };
+        
+        let preview_title = if let Some(subdir) = &self.subdir {
+            format!(" 👁  Preview: {} ", subdir.name)
+        } else {
+            " 👁  Preview ".to_string()
+        };
+        
         let list2 = List::new(items2)
-            .block(Block::bordered().title("Subdirectory"))
-            .style(Style::new().white())
-            .highlight_style(Style::new().italic().yellow())
-            .highlight_symbol(">> ")
-            .repeat_highlight_symbol(true)
+            .block(
+                Block::bordered()
+                    .title(preview_title)
+                    .title_style(Style::new().bold().magenta())
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::new().magenta())
+            )
+            .style(Style::new().fg(Color::Rgb(180, 180, 200)))
             .direction(ListDirection::TopToBottom);
 
         frame.render_widget(
@@ -120,17 +169,24 @@ impl App {
                 x: frame.area().width / 2,
                 y: 0,
                 width: frame.area().width / 2,
-                height: frame.area().height - 2,
+                height: frame.area().height - 3,
             },
         );
 
+        // Status bar at bottom
         frame.render_widget(
-            Paragraph::new(helper_text).centered(),
+            Paragraph::new(helper_text)
+                .centered()
+                .block(
+                    Block::bordered()
+                        .border_type(BorderType::Double)
+                        .border_style(Style::new().green())
+                ),
             Rect {
                 x: 0,
-                y: frame.area().height - 2,
+                y: frame.area().height - 3,
                 width: frame.area().width,
-                height: 2,
+                height: 3,
             },
         );
 
@@ -145,15 +201,22 @@ impl App {
 
             let dialog = ConfirmationDialog {
                 message: msg,
-                // confirmed: false,
             };
 
             frame.render_widget(dialog, area);
         }
 
         if self.show_rename {
-            let area = centered_rect(50, 20, frame.area());
-            let block = Block::bordered().title("Rename File");
+            use ratatui::style::Color;
+            use ratatui::widgets::BorderType;
+            
+            let area = centered_rect(60, 25, frame.area());
+            let block = Block::bordered()
+                .title(" ✏️  Rename File ")
+                .title_style(Style::new().bold().yellow())
+                .border_type(BorderType::Rounded)
+                .border_style(Style::new().yellow())
+                .style(Style::new().bg(Color::Rgb(30, 30, 40)));
             let inner = block.inner(area);
             frame.render_widget(block, area);
 
@@ -161,8 +224,16 @@ impl App {
         }
 
         if self.show_new_file {
-            let area = centered_rect(50, 20, frame.area());
-            let block = Block::bordered().title("New File");
+            use ratatui::style::Color;
+            use ratatui::widgets::BorderType;
+            
+            let area = centered_rect(60, 25, frame.area());
+            let block = Block::bordered()
+                .title(" ➕ New File ")
+                .title_style(Style::new().bold().green())
+                .border_type(BorderType::Rounded)
+                .border_style(Style::new().green())
+                .style(Style::new().bg(Color::Rgb(30, 30, 40)));
             let inner = block.inner(area);
             frame.render_widget(block, area);
 
@@ -615,16 +686,32 @@ impl App {
 
 struct ConfirmationDialog {
     message: String,
-    // confirmed: bool,
 }
 
 impl Widget for ConfirmationDialog {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered().title("Confirm Deletion");
+        use ratatui::style::Color;
+        use ratatui::widgets::BorderType;
+        
+        let block = Block::bordered()
+            .title(" ⚠️  Confirm Deletion ")
+            .title_style(Style::new().bold().red())
+            .border_type(BorderType::Rounded)
+            .border_style(Style::new().red())
+            .style(Style::new().bg(Color::Rgb(40, 20, 20)));
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let text = Text::from(Line::from(self.message.as_str()).centered());
+        let text = Text::from(vec![
+            Line::from(""),
+            Line::from(self.message.as_str())
+                .centered()
+                .style(Style::new().bold().white()),
+            Line::from(""),
+            Line::from(" Press Y to confirm, N to cancel ")
+                .centered()
+                .style(Style::new().fg(Color::Rgb(150, 150, 150))),
+        ]);
         Paragraph::new(text).centered().render(inner, buf);
     }
 }
