@@ -71,7 +71,31 @@ impl App {
             .repeat_highlight_symbol(true)
             .direction(ListDirection::TopToBottom);
 
-        frame.render_stateful_widget(list, frame.area(), &mut self.list_state);
+        let helper_text = Text::from(
+            Line::from("q: Quit | ↑/k: Up | ↓/j: Down | ←/h: Back | →/l: Enter | Enter: Open | d: Delete | r: Rename | y: Yank Path | a: New File")
+                .style(Style::new().dark_gray()),
+        );
+
+        // frame.render_stateful_widget(list, frame.area(), &mut self.list_state);
+        frame.render_stateful_widget(
+            list,
+            Rect {
+                x: 0,
+                y: 0,
+                width: frame.area().width,
+                height: frame.area().height - 2,
+            },
+            &mut self.list_state,
+        );
+        frame.render_widget(
+            Paragraph::new(helper_text).centered(),
+            Rect {
+                x: 0,
+                y: frame.area().height - 2,
+                width: frame.area().width,
+                height: 2,
+            },
+        );
 
         // Render confirmation overlay if active
         if self.show_confirmation {
