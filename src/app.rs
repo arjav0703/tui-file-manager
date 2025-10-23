@@ -26,6 +26,13 @@ pub struct App {
     pub file_to_delete: Option<String>,
     pub file_to_rename: Option<String>,
     pub rename_input: TextArea<'static>,
+    pub clipboard: Option<Clipboard>,
+}
+
+#[derive(Debug)]
+struct Clipboard {
+    pub cut: bool,
+    pub path: String,
 }
 
 impl App {
@@ -49,6 +56,7 @@ impl App {
             show_confirmation: false,
             file_to_rename: None,
             file_to_delete: None,
+            clipboard: None,
             rename_input,
             new_file_input,
             show_new_file: false,
@@ -306,6 +314,15 @@ impl App {
             KeyCode::Char('r') => self.rename_file(),
             KeyCode::Char('y') => self.yank_file(),
             KeyCode::Char('a') => self.new_file(),
+            KeyCode::Char('c') => {
+                self.handle_copy_file();
+            }
+            KeyCode::Char('x') => {
+                self.handle_cut_file();
+            }
+            KeyCode::Char('p') => {
+                self.handle_paste().await;
+            }
             _ => {}
         }
         Ok(())
@@ -535,6 +552,56 @@ impl App {
 
                 let _ = process.wait();
             }
+        }
+    }
+
+    fn handle_copy_file(&mut self) {
+        if let Some(i) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(i) {
+                let full_path = format!("{}/{}", self.dir.path, selected_entry);
+                self.clipboard = Some(Clipboard {
+                    cut: false,
+                    path: full_path,
+                });
+            }
+        }
+    }
+
+    fn handle_cut_file(&mut self) {
+        if let Some(i) = self.list_state.selected() {
+            let entries = self.dir.entries();
+            if let Some(selected_entry) = entries.get(i) {
+                let full_path = format!("{}/{}", self.dir.path, selected_entry);
+                self.clipboard = Some(Clipboard {
+                    cut: true,
+                    path: full_path,
+                });
+            }
+        }
+    }
+
+    async fn handle_paste(&mut self) {
+        if let Some(clipboard_path) = &self.clipboard.as_ref().map(|c| &c.path) {
+            let filename = clipboard_path.rsplit('/').next().unwrap_or("pasted_file");
+            let new_path = format!("{}/{}", self.dir.path, filename);
+            if let Err(err) = fs::copy(clipboard_path, &new_path) {
+                eprintln!("Failed to paste file: {err}");
+            } else {
+                self.dir.scan_and_add().await.unwrap();
+            }
+        }
+
+        if let Some(to_cut) = &self.clipboard {
+            if to_cut.cut {
+                if let Err(_r) = fs::remove_file(&to_cut.path) {
+                    fs::remove_dir_all(&to_cut.path).unwrap_or_else(|err| {
+                        eprintln!("Failed to delete original directory after cut: {err}");
+                    });
+                }
+                self.dir.scan_and_add().await.unwrap();
+            }
+            self.clipboard = None;
         }
     }
 
