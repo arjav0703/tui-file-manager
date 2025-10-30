@@ -123,7 +123,7 @@ impl Directory {
         self.subdirectories.push(subdirectory);
     }
 
-    pub async fn scan_and_add(&mut self) -> Result<()> {
+    pub async fn scan_and_add(&mut self, include_hidden_files: bool) -> Result<()> {
         self.files.clear();
         self.subdirectories.clear();
 
@@ -135,6 +135,9 @@ impl Directory {
             let path = entry.path();
             if path.is_file() {
                 if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    if !include_hidden_files && file_name.starts_with('.') {
+                        continue;
+                    }
                     let filesize = fs::File::open(&path)
                         .ok()
                         .and_then(|f| f.metadata().ok())

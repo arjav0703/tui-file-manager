@@ -47,7 +47,7 @@ impl App {
                         self.dir = Directory::new(new_name, new_path);
 
                         // Scan the new directory
-                        self.dir.scan_and_add().await.unwrap();
+                        self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
                         self.list_state.select(Some(0));
                         self.update_subdir_preview_async().await;
                     }
@@ -73,7 +73,7 @@ impl App {
             self.dir = Directory::new(parent_name, parent_str.to_string());
 
             // Scan the parent directory
-            self.dir.scan_and_add().await.unwrap();
+            self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
             self.list_state.select(Some(0));
             self.update_subdir_preview_async().await;
         }
@@ -91,7 +91,11 @@ impl App {
                 if let Some(subdir) = self.dir.subdirectories.iter().find(|d| d.name == dir_name) {
                     let mut preview_dir = Directory::new(subdir.name.clone(), subdir.path.clone());
                     // Scan asynchronously
-                    if preview_dir.scan_and_add().await.is_ok() {
+                    if preview_dir
+                        .scan_and_add(self.show_hidden_files)
+                        .await
+                        .is_ok()
+                    {
                         self.subdir = Some(preview_dir);
                     } else {
                         self.subdir = None;

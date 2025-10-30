@@ -12,7 +12,7 @@ impl App {
                                 eprintln!("Failed to delete directory: {err}");
                             });
                         }
-                        self.dir.scan_and_add().await.unwrap();
+                        self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
                     }
                     self.show_confirmation = false;
                     self.file_to_delete = None;

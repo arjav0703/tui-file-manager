@@ -12,6 +12,7 @@ use std::fs;
 use tui_textarea::TextArea;
 
 mod commands;
+mod config;
 mod confirmation;
 mod key_handler;
 mod navigation;
@@ -34,6 +35,7 @@ pub struct App {
     pub file_to_rename: Option<String>,
     pub rename_input: TextArea<'static>,
     pub clipboard: Option<Clipboard>,
+    pub show_hidden_files: bool,
 }
 
 #[derive(Debug)]
@@ -54,6 +56,8 @@ impl App {
         let mut new_file_input = TextArea::default();
         new_file_input.set_block(Block::bordered().title("New name"));
 
+        let show_hidden_files = config::load_config().show_hidden_files;
+
         let mut app = Self {
             exit: false,
             dir: current_dir,
@@ -67,6 +71,7 @@ impl App {
             rename_input,
             new_file_input,
             show_new_file: false,
+            show_hidden_files,
         };
 
         app.update_subdir_preview_async().await;

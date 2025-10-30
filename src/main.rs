@@ -9,7 +9,7 @@ async fn main() -> Result<()> {
     let terminal = ratatui::init();
 
     let mut app = App::new().await;
-    app.dir.scan_and_add().await.unwrap();
+    app.dir.scan_and_add(app.show_hidden_files).await.unwrap();
 
     let subdir = app.dir.subdirectories.first().cloned();
 

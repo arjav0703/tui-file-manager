@@ -153,7 +153,7 @@ impl App {
             if let Err(err) = fs::copy(clipboard_path, &new_path) {
                 eprintln!("Failed to paste file: {err}");
             } else {
-                self.dir.scan_and_add().await.unwrap();
+                self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
             }
         }
 
@@ -164,7 +164,7 @@ impl App {
                         eprintln!("Failed to delete original directory after cut: {err}");
                     });
                 }
-                self.dir.scan_and_add().await.unwrap();
+                self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
             }
             self.clipboard = None;
         }
@@ -190,7 +190,7 @@ impl App {
                         if let Err(err) = fs::rename(&old_path, &new_path) {
                             eprintln!("Failed to rename file: {err}");
                         } else {
-                            self.dir.scan_and_add().await.unwrap();
+                            self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
                         }
                     }
                 }
@@ -224,7 +224,7 @@ impl App {
                     if let Err(err) = fs::File::create(&new_path) {
                         eprintln!("Failed to create file: {err}");
                     } else {
-                        self.dir.scan_and_add().await.unwrap();
+                        self.dir.scan_and_add(self.show_hidden_files).await.unwrap();
                     }
                 }
                 self.new_file_input = TextArea::default();
