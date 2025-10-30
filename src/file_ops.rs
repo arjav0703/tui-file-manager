@@ -22,6 +22,21 @@ pub enum FileType {
 pub struct FileEntry {
     pub name: String,
     pub filetype: FileType,
+    size: Option<Filesize>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Filesize {
+    pub size_in_bytes: u64,
+}
+
+impl Filesize {
+    pub fn as_mb(&self) -> f64 {
+        self.size_in_bytes as f64 / 1_048_576.0
+    }
+    pub fn as_gb(&self) -> f64 {
+        self.as_mb() / 1024.0
+    }
 }
 
 impl FileEntry {
@@ -64,7 +79,20 @@ impl FileEntry {
             FileType::Unknown => "❓",
         };
 
-        format!("{} {}", symbol, self.name)
+        let size = self.size.as_ref().map(|s| {
+            if s.as_gb() >= 1.0 {
+                format!("{:.2} GB", s.as_gb())
+            } else {
+                format!("{:.2} MB", s.as_mb())
+            }
+        });
+
+        format!(
+            "{} {} ({})",
+            symbol,
+            self.name,
+            size.unwrap_or("Size Unknown".to_string())
+        )
     }
 }
 
@@ -107,9 +135,16 @@ impl Directory {
             let path = entry.path();
             if path.is_file() {
                 if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    let filesize = fs::File::open(&path)
+                        .ok()
+                        .and_then(|f| f.metadata().ok())
+                        .map(|meta| Filesize {
+                            size_in_bytes: meta.len(),
+                        });
                     let mut file = FileEntry {
                         name: file_name.to_string(),
                         filetype: FileType::Unknown,
+                        size: filesize,
                     };
                     let filetype = file.enumerate_filetype();
                     file.filetype = filetype;
