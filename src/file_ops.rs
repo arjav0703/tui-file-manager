@@ -11,7 +11,8 @@ pub struct Directory {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FileType {
     Executable,
-    Media,
+    Audio,
+    Visual,
     Document,
     Zip,
     Code,
@@ -59,7 +60,8 @@ impl FileEntry {
 
         let filetype: FileType = match extension.as_str() {
             "exe" | "bat" | "sh" => FileType::Executable,
-            "mp3" | "mp4" | "wav" | "flac" | "jpg" | "png" | "gif" => FileType::Media,
+            "mp3" | "ogg" | "wav" => FileType::Audio,
+            "mp4" | "mkv" | "avi" | "mov" | "jpg" | "png" | "gif" => FileType::Visual,
             "pdf" | "doc" | "docx" | "txt" | "odt" | "json" | "toml" => FileType::Document,
             "zip" | "rar" | "7z" | "tar" | "gz" => FileType::Zip,
             "rs" | "py" | "js" | "java" | "c" | "cpp" | "html" | "css" => FileType::Code,
@@ -72,7 +74,8 @@ impl FileEntry {
     pub fn assign_symbol(&self) -> String {
         let symbol = match self.filetype {
             FileType::Executable => "⚙️ ",
-            FileType::Media => "🎵 ",
+            FileType::Audio => "🎵 ",
+            FileType::Visual => "🖼️ ",
             FileType::Document => "📄 ",
             FileType::Zip => "🗜️ ",
             FileType::Code => r"</> ",
